@@ -11,6 +11,7 @@
 #include <iostream>
 
 #include <omp.h>
+#include <mpi.h>
 
 const double pi        = 3.14159265358979323846264338327;   //Pi
 const double grav      = 9.8;                               //Gravitational acceleration (m / s^2)
@@ -56,6 +57,7 @@ int    nx_cfd, nz_cfd;      //Number of total grid cells in the x- and z- dimens
 int    i_beg, k_beg;          //beginning index in the x- and z-directions for this MPI task
 int    nranks, myrank;        //Number of MPI ranks and my rank id
 int    masterproc;            //Am I the master process (rank == 0)?
+int    ngbl, ngbr;
 int    config_spec;         //Which data initialization to use
 double *cfd_dens_cell;         //density (vert cell avgs).   Dimensions: (1-hs:nnz+hs)
 double *cfd_dens_theta_cell;   //rho*t (vert cell avgs).     Dimensions: (1-hs:nnz+hs)
@@ -304,7 +306,6 @@ void do_dir_z( double *state , double *flux , double *tend ) {
     }
 }
 
-
 //Set this MPI task's halo values in the x-direction. This routine will require MPI
 void exchange_border_x( double *state ) {
   ////////////////////////////////////////////////////////////////////////
@@ -318,13 +319,21 @@ void exchange_border_x( double *state ) {
   //////////////////////////////////////////////////////
   // DELETE THE SERIAL CODE BELOW AND REPLACE WITH MPI
   //////////////////////////////////////////////////////
+/* #pragma omp parallel for simd collapse(2) */
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs);
-      state[pos           ] = state[pos + nnx  ];
-      state[pos + 1       ] = state[pos + nnx+1];
-      state[pos + nnx+hs  ] = state[pos + hs   ];
-      state[pos + nnx+hs+1] = state[pos + hs+1 ];
+
+      MPI_Send(state + pos + nnx, hs, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD);
+      MPI_Recv(state + pos, hs, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+      /* state[pos + 0      ] = state[pos + nnx     ]; */
+      /* state[pos + 1      ] = state[pos + nnx+1   ]; */
+      /* state[pos + nnx+hs  ] = state[pos + hs     ]; */
+      /* state[pos + nnx+hs+1] = state[pos + hs+1   ]; */
+
+      MPI_Send(state + pos + hs, hs, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD);
+      MPI_Recv(state + pos + nnx+hs, hs, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
   }
   ////////////////////////////////////////////////////
@@ -399,6 +408,7 @@ void initialize( int *argc , char ***argv ) {
   dx = xlen / nx_cfd;
   dz = zlen / nz_cfd;
 
+  MPI_Init(argc, argv);
   /////////////////////////////////////////////////////////////
   // BEGIN MPI DUMMY SECTION
   // TODO: (1) GET NUMBER OF MPI RANKS
@@ -407,14 +417,24 @@ void initialize( int *argc , char ***argv ) {
   //       (4) COMPUTE HOW MANY X-DIRECTION CELLS MY RANK HAS
   //       (5) FIND MY LEFT AND RIGHT NEIGHBORING RANK IDs
   /////////////////////////////////////////////////////////////
-  i_beg = 0;
-  nnx = nx_cfd;
   nranks = 1;
   myrank = 0;
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+
+  if (nx_cfd % nranks != 0) std::cout << "ERROR: Unable to split NX equally between processes" << std::endl;
+
+  nnx = nx_cfd / nranks;
+  i_beg = myrank * nnx;
+
+  ngbl = (myrank + nranks - 1) % nranks;
+  ngbr = (myrank + 1) % nranks;
+
+  std::cout << "Hello from " << myrank << "/" << nranks << "! My work: [" << i_beg << ", " << i_beg+nnx << ")" << std::endl;
   //////////////////////////////////////////////
   // END MPI DUMMY SECTION
   //////////////////////////////////////////////
-
 
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
@@ -694,6 +714,15 @@ void finalize() {
   free( cfd_pressure_int );
 }
 
+//gather results from other MPI tasks
+void gather_results() {
+  for (int ll=0; ll<NUM_VARS; ll++) {
+    for (int k=0; k<nnz; k++) {
+      int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + i_beg+hs;
+      MPI_Gather(state + pos, nnx, MPI_DOUBLE, state, nnx, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    }
+  }
+}
 
 //Compute reduced quantities for error checking without resorting
 void do_results( double &mass , double &te ) {
@@ -746,7 +775,7 @@ int main(int argc, char **argv) {
   ////////////////////////////////////////////////////
   // MAIN TIME STEP LOOP
   ////////////////////////////////////////////////////
-  auto c_start = OMP_Wtime();
+  auto c_start = MPI_Wtime();
   while (etime < sim_time) {
     for (int k = 0; k < 5; k++)
       //If the time step leads to exceeding the simulation time, shorten it for the last step
@@ -763,12 +792,13 @@ int main(int argc, char **argv) {
       if (masterproc) { printf( "Elapsed Time: %lf / %lf\n", etime , sim_time ); }  
     }
   }
-  auto c_end = OMP_Wtime();
+  auto c_end = MPI_Wtime();
   if (masterproc) {
     std::cout << "CPU Time: " << (c_end-c_start) << " sec\n";
   }
 
   //Final reductions for mass, kinetic energy, and total energy
+  gather_results();
   do_results(mass,te);
 
   if (masterproc) {
@@ -777,6 +807,7 @@ int main(int argc, char **argv) {
   }
 
   finalize();
+  MPI_Finalize();
 }
 
 
