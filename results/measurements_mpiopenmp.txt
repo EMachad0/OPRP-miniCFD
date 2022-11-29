@@ -1,0 +1,18 @@
+Hello from 3/8! My work: [300, 400)
+Hello from 4/8! My work: [400, 500)
+Hello from 5/8! My work: [500, 600)
+Hello from 6/8! My work: [600, 700)
+Hello from 7/8! My work: [700, 800)
+Hello from 1/8! My work: [100, 200)
+Hello from 2/8! My work: [200, 300)
+Hello from 0/8! My work: [0, 100)
+nx_cfd, nz_cfd: 800 400
+dx,dz: 25.000000 25.000000
+dt: 0.083333
+Elapsed Time: 100.083333 / 400.000000
+Elapsed Time: 200.083333 / 400.000000
+Elapsed Time: 300.083333 / 400.000000
+Elapsed Time: 400.000000 / 400.000000
+CPU Time: 143.745 sec
+d_mass: 5.771173e-03
+d_te:   1.235640e-03
