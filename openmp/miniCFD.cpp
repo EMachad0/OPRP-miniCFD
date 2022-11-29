@@ -746,7 +746,7 @@ int main(int argc, char **argv) {
   ////////////////////////////////////////////////////
   // MAIN TIME STEP LOOP
   ////////////////////////////////////////////////////
-  auto c_start = OMP_Wtime();
+  auto c_start = omp_wtime();
   while (etime < sim_time) {
     for (int k = 0; k < 5; k++)
       //If the time step leads to exceeding the simulation time, shorten it for the last step
@@ -763,7 +763,7 @@ int main(int argc, char **argv) {
       if (masterproc) { printf( "Elapsed Time: %lf / %lf\n", etime , sim_time ); }  
     }
   }
-  auto c_end = OMP_Wtime();
+  auto c_end = omp_wtime();
   if (masterproc) {
     std::cout << "CPU Time: " << (c_end-c_start) << " sec\n";
   }
