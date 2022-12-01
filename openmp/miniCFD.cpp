@@ -155,7 +155,7 @@ void do_semi_step( double *state_init , double *state_forcing , double *state_ou
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Apply the tendencies to the fluid state
-#pragma omp parallel for simd collapse(3)
+#pragma omp parallel for collapse(3)
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -179,7 +179,7 @@ void do_dir_x( double *state , double *flux , double *tend ) {
   /////////////////////////////////////////////////
   //Compute fluxes in the x-direction for each cell
   double d_vals[NUM_VARS], vals[NUM_VARS];
-#pragma omp parallel for simd collapse(2) private(vals, d_vals)
+#pragma omp parallel for collapse(2) private(vals, d_vals)
   for (int k=0; k<nnz; k++) {
     for (int i=0; i<nnx+1; i++) {
       //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -217,7 +217,7 @@ void do_dir_x( double *state , double *flux , double *tend ) {
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Use the fluxes to compute tendencies for each cell
-#pragma omp parallel for simd collapse(3)
+#pragma omp parallel for collapse(3)
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -243,7 +243,7 @@ void do_dir_z( double *state , double *flux , double *tend ) {
   /////////////////////////////////////////////////
   //Compute fluxes in the x-direction for each cell
   double d_vals[NUM_VARS], vals[NUM_VARS];
-#pragma omp parallel for simd collapse(2) private(vals, d_vals)
+#pragma omp parallel for collapse(2) private(vals, d_vals)
   for (int k=0; k<nnz+1; k++) {
     for (int i=0; i<nnx; i++) {
       //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -283,7 +283,7 @@ void do_dir_z( double *state , double *flux , double *tend ) {
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Use the fluxes to compute tendencies for each cell
-#pragma omp parallel for simd collapse(3)
+#pragma omp parallel for collapse(3)
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -294,7 +294,7 @@ void do_dir_z( double *state , double *flux , double *tend ) {
       }
     }
   }
-#pragma omp parallel for simd collapse(2)
+#pragma omp parallel for collapse(2)
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
         int indt  = POS_WMOM* nnz   * nnx    + k* nnx    + i  ;
@@ -355,7 +355,7 @@ void exchange_border_z( double *state ) {
   /////////////////////////////////////////////////
   // TODO: THREAD ME
   /////////////////////////////////////////////////
-#pragma omp parallel for simd collapse(2)
+#pragma omp parallel for collapse(2)
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int i=0; i<nnx+2*hs; i++) {
       state[ll*(nnz+2*hs)*(nnx+2*hs) + (0      )*(nnx+2*hs) + i] = state[ll*(nnz+2*hs)*(nnx+2*hs) + (hs     )*(nnx+2*hs) + i];
@@ -364,7 +364,7 @@ void exchange_border_z( double *state ) {
       state[ll*(nnz+2*hs)*(nnx+2*hs) + (nnz+hs+1)*(nnx+2*hs) + i] = state[ll*(nnz+2*hs)*(nnx+2*hs) + (nnz+hs-1)*(nnx+2*hs) + i];
     }
   }
-#pragma omp parallel for simd
+#pragma omp parallel for
   for (int i=0; i<nnx+2*hs; i++) {
     int ll = POS_WMOM;
     state[ll*(nnz+2*hs)*(nnx+2*hs) + (0      )*(nnx+2*hs) + i] = 0.;
@@ -453,7 +453,7 @@ void initialize( int *argc , char ***argv ) {
   //////////////////////////////////////////////////////////////////////////
   // Initialize the cell-averaged fluid state via Gauss-Legendre quadrature
   //////////////////////////////////////////////////////////////////////////
-#pragma omp parallel for simd collapse(3)
+#pragma omp parallel for collapse(3)
   for (int k=0; k<nnz+2*hs; k++) {
     for (int i=0; i<nnx+2*hs; i++) {
       //Initialize the state to zero
@@ -509,7 +509,7 @@ void initialize( int *argc , char ***argv ) {
       }
     }
   }
-#pragma omp parallel for simd collapse(3)
+#pragma omp parallel for collapse(3)
   for (int k=0; k<nnz+2*hs; k++) {
     for (int i=0; i<nnx+2*hs; i++) {
       for (int ll=0; ll<NUM_VARS; ll++) {
