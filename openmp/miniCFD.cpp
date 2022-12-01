@@ -155,7 +155,7 @@ void do_semi_step( double *state_init , double *state_forcing , double *state_ou
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Apply the tendencies to the fluid state
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -179,7 +179,7 @@ void do_dir_x( double *state , double *flux , double *tend ) {
   /////////////////////////////////////////////////
   //Compute fluxes in the x-direction for each cell
   double d_vals[NUM_VARS], vals[NUM_VARS];
-#pragma omp parallel for collapse(2) private(vals, d_vals)
+#pragma omp parallel for private(vals, d_vals)
   for (int k=0; k<nnz; k++) {
     for (int i=0; i<nnx+1; i++) {
       //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -217,7 +217,7 @@ void do_dir_x( double *state , double *flux , double *tend ) {
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Use the fluxes to compute tendencies for each cell
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -243,7 +243,7 @@ void do_dir_z( double *state , double *flux , double *tend ) {
   /////////////////////////////////////////////////
   //Compute fluxes in the x-direction for each cell
   double d_vals[NUM_VARS], vals[NUM_VARS];
-#pragma omp parallel for collapse(2) private(vals, d_vals)
+#pragma omp parallel for private(vals, d_vals)
   for (int k=0; k<nnz+1; k++) {
     for (int i=0; i<nnx; i++) {
       //Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -283,7 +283,7 @@ void do_dir_z( double *state , double *flux , double *tend ) {
   // TODO: THREAD ME
   /////////////////////////////////////////////////
   //Use the fluxes to compute tendencies for each cell
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       for (int i=0; i<nnx; i++) {
@@ -294,14 +294,14 @@ void do_dir_z( double *state , double *flux , double *tend ) {
       }
     }
   }
-#pragma omp parallel for collapse(2)
-    for (int k=0; k<nnz; k++) {
-      for (int i=0; i<nnx; i++) {
-        int indt  = POS_WMOM* nnz   * nnx    + k* nnx    + i  ;
-        int inds = POS_DENS*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + i+hs;
-        tend[indt] = tend[indt] - state[inds]*grav;
-      }
-    }
+#pragma omp parallel for
+  for (int k=0; k<nnz; k++) {
+	for (int i=0; i<nnx; i++) {
+	  int indt  = POS_WMOM* nnz   * nnx    + k* nnx    + i  ;
+	  int inds = POS_DENS*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + i+hs;
+	  tend[indt] = tend[indt] - state[inds]*grav;
+	}
+  }
 }
 
 
@@ -331,7 +331,7 @@ void exchange_border_x( double *state ) {
 
   if (config_spec == CONFIG_IN_TEST6) {
     if (myrank == 0) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
       for (int k=0; k<nnz; k++) {
         for (int i=0; i<hs; i++) {
           double z = (k_beg + k+0.5)*dz;
@@ -355,7 +355,7 @@ void exchange_border_z( double *state ) {
   /////////////////////////////////////////////////
   // TODO: THREAD ME
   /////////////////////////////////////////////////
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int i=0; i<nnx+2*hs; i++) {
       state[ll*(nnz+2*hs)*(nnx+2*hs) + (0      )*(nnx+2*hs) + i] = state[ll*(nnz+2*hs)*(nnx+2*hs) + (hs     )*(nnx+2*hs) + i];
@@ -372,7 +372,7 @@ void exchange_border_z( double *state ) {
     state[ll*(nnz+2*hs)*(nnx+2*hs) + (nnz+hs  )*(nnx+2*hs) + i] = 0.;
     state[ll*(nnz+2*hs)*(nnx+2*hs) + (nnz+hs+1)*(nnx+2*hs) + i] = 0.;
   }
-    //Impose the vertical momentum effects of an artificial cos^2 mountain at the lower boundary
+  //Impose the vertical momentum effects of an artificial cos^2 mountain at the lower boundary
   if (config_spec == CONFIG_IN_TEST3) { 
   const double mnt_width = xlen/8;
 #pragma omp parallel for
@@ -453,7 +453,6 @@ void initialize( int *argc , char ***argv ) {
   //////////////////////////////////////////////////////////////////////////
   // Initialize the cell-averaged fluid state via Gauss-Legendre quadrature
   //////////////////////////////////////////////////////////////////////////
-#pragma omp parallel for collapse(3)
   for (int k=0; k<nnz+2*hs; k++) {
     for (int i=0; i<nnx+2*hs; i++) {
       //Initialize the state to zero
@@ -463,7 +462,6 @@ void initialize( int *argc , char ***argv ) {
       }
     }
   }
-#pragma omp parallel for collapse(4)
   for (int k=0; k<nnz+2*hs; k++) {
     for (int i=0; i<nnx+2*hs; i++) {
       //Use Gauss-Legendre quadrature to initialize a balance + temperature perturbation
@@ -509,7 +507,6 @@ void initialize( int *argc , char ***argv ) {
       }
     }
   }
-#pragma omp parallel for collapse(3)
   for (int k=0; k<nnz+2*hs; k++) {
     for (int i=0; i<nnx+2*hs; i++) {
       for (int ll=0; ll<NUM_VARS; ll++) {
@@ -519,7 +516,6 @@ void initialize( int *argc , char ***argv ) {
     }
   }
   //Compute the background state over vertical cell averages
-#pragma omp parallel for
   for (int k=0; k<nnz+2*hs; k++) {
     cfd_dens_cell      [k] = 0.;
     cfd_dens_theta_cell[k] = 0.;
@@ -537,7 +533,6 @@ void initialize( int *argc , char ***argv ) {
     }
   }
   //Compute the background state at vertical cell interfaces
-#pragma omp parallel for
   for (int k=0; k<nnz+1; k++) {
     double z = (k_beg + k)*dz;
     if (config_spec == CONFIG_IN_TEST1      ) { testcase1      (0.,z,r,u,w,t,hr,ht); }
