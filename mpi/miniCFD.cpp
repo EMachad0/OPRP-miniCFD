@@ -73,6 +73,7 @@ double output_counter;        //Helps determine when it's time to do output
 //Runtime variable arrays
 double *state;                //Fluid state.             Dimensions: (1-hs:nnx+hs,1-hs:nnz+hs,NUM_VARS)
 double *state_tmp;            //Fluid state.             Dimensions: (1-hs:nnx+hs,1-hs:nnz+hs,NUM_VARS)
+double *mpistate;
 double *flux;                 //Cell interface fluxes.   Dimensions: (nnx+1,nnz+1,NUM_VARS)
 double *tend;                 //Fluid state tendencies.  Dimensions: (nnx,nnz,NUM_VARS)
 int    num_out = 0;           //The number of outputs performed so far
@@ -313,22 +314,69 @@ void exchange_border_x( double *state ) {
   //////////////////////////////////////////////////////
   // DELETE THE SERIAL CODE BELOW AND REPLACE WITH MPI
   //////////////////////////////////////////////////////
-  for (int ll=0; ll<NUM_VARS; ll++) {
-    for (int k=0; k<nnz; k++) {
-      int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs);
 
-      MPI_Send(state + pos + nnx, hs, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD);
-      MPI_Recv(state + pos, hs, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  // auto c_start = MPI_Wtime();
 
-      /* state[pos + 0      ] = state[pos + nnx     ]; */
-      /* state[pos + 1      ] = state[pos + nnx+1   ]; */
-      /* state[pos + nnx+hs  ] = state[pos + hs     ]; */
-      /* state[pos + nnx+hs+1] = state[pos + hs+1   ]; */
-
-      MPI_Send(state + pos + hs, hs, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD);
-      MPI_Recv(state + pos + nnx+hs, hs, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  int sz = hs * NUM_VARS * nnz;
+	for (int i = 0; i < hs; i++) {
+    for (int ll=0; ll<NUM_VARS; ll++) {
+      for (int k=0; k<nnz; k++) {
+        int idx = i*NUM_VARS*nnz + ll*nnz + k;
+        int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + nnx + i;
+        mpistate[idx] = state[pos];
+      }
     }
-  }
+	}
+  
+  MPI_Send(mpistate, sz, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD);
+  MPI_Recv(mpistate, sz, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	for (int i = 0; i < hs; i++) {
+    for (int ll=0; ll<NUM_VARS; ll++) {
+      for (int k=0; k<nnz; k++) {
+        int idx = i*NUM_VARS*nnz + ll*nnz + k;
+        int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + i;
+        state[pos] = mpistate[idx];
+      }
+    }
+	}
+
+	for (int i = 0; i < hs; i++) {
+    for (int ll=0; ll<NUM_VARS; ll++) {
+      for (int k=0; k<nnz; k++) {
+        int idx = i*NUM_VARS*nnz + ll*nnz + k;
+        int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + hs + i;
+        mpistate[idx] = state[pos];
+      }
+    }
+	}
+
+  MPI_Send(mpistate, sz, MPI_DOUBLE, ngbl, 0, MPI_COMM_WORLD);
+  MPI_Recv(mpistate, sz, MPI_DOUBLE, ngbr, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	for (int i = 0; i < hs; i++) {
+    for (int ll=0; ll<NUM_VARS; ll++) {
+      for (int k=0; k<nnz; k++) {
+        int idx = i*NUM_VARS*nnz + ll*nnz + k;
+        int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + nnx+hs+i;
+        state[pos] = mpistate[idx];
+      }
+    }
+	}
+
+  // for (int ll=0; ll<NUM_VARS; ll++) {
+  //   for (int k=0; k<nnz; k++) {
+  //     int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs);
+  //     state[pos           ] = state[pos + nnx  ];
+  //     state[pos + 1       ] = state[pos + nnx+1];
+  //     state[pos + nnx+hs  ] = state[pos + hs   ];
+  //     state[pos + nnx+hs+1] = state[pos + hs+1 ];
+  //   }
+  // }
+
+
+  // auto c_end = MPI_Wtime();
+  // std::cout << "comm time: " << (c_end-c_start) << std::endl;
   ////////////////////////////////////////////////////
 
   if (config_spec == CONFIG_IN_TEST6) {
@@ -420,7 +468,7 @@ void initialize( int *argc , char ***argv ) {
   ngbl = (myrank + nranks - 1) % nranks;
   ngbr = (myrank + 1) % nranks;
 
-  std::cout << "Hello from " << myrank << "/" << nranks << "! My work: [" << i_beg << ", " << i_beg+nnx << ")" << std::endl;
+  // std::cout << "Hello from " << myrank << "/" << nranks << "! My work: [" << i_beg << ", " << i_beg+nnx << ")" << std::endl;
   //////////////////////////////////////////////
   // END MPI DUMMY SECTION
   //////////////////////////////////////////////
@@ -439,6 +487,7 @@ void initialize( int *argc , char ***argv ) {
   //Allocate the model data
   state              = (double *) malloc( (nnx+2*hs)*(nnz+2*hs)*NUM_VARS*sizeof(double) );
   state_tmp          = (double *) malloc( (nnx+2*hs)*(nnz+2*hs)*NUM_VARS*sizeof(double) );
+  mpistate = (double *) malloc( hs * nnz * NUM_VARS * sizeof(double) );
   flux               = (double *) malloc( (nnx+1)*(nnz+1)*NUM_VARS*sizeof(double) );
   tend               = (double *) malloc( nnx*nnz*NUM_VARS*sizeof(double) );
   cfd_dens_cell       = (double *) malloc( (nnz+2*hs)*sizeof(double) );
@@ -703,7 +752,7 @@ void gather_results() {
   for (int ll=0; ll<NUM_VARS; ll++) {
     for (int k=0; k<nnz; k++) {
       int pos = ll*(nnz+2*hs)*(nnx+2*hs) + (k+hs)*(nnx+2*hs) + i_beg+hs;
-      MPI_Gather(state + pos, nnx, MPI_DOUBLE, state, nnx, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      // MPI_Gather(state + pos, nnx, MPI_DOUBLE, state, nnx, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
   }
 }
