@@ -1,0 +1,10 @@
+nx_cfd, nz_cfd: 800 400
+dx,dz: 25.000000 25.000000
+dt: 0.083333
+Elapsed Time: 100.083333 / 400.000000
+Elapsed Time: 200.083333 / 400.000000
+Elapsed Time: 300.083333 / 400.000000
+Elapsed Time: 400.000000 / 400.000000
+CPU Time: 118.642 sec
+d_mass: 3.613057e-03
+d_te:   3.938674e-03
