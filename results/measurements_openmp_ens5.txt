@@ -5,6 +5,6 @@ Elapsed Time: 100.083333 / 400.000000
 Elapsed Time: 200.083333 / 400.000000
 Elapsed Time: 300.083333 / 400.000000
 Elapsed Time: 400.000000 / 400.000000
-CPU Time: 291.205 sec
-d_mass: -3.326399e-13
-d_te:   9.486405e-05
+CPU Time: 181.317 sec
+d_mass: -3.435782e-13
+d_te:   1.040376e-04
